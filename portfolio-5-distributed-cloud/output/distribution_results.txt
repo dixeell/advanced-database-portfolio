@@ -1,0 +1,18 @@
+=== 1. SHARDING 2,000 student documents across 3 shards ===
+Hash(matric_no) % 3      : {0: 737, 1: 634, 2: 629} -> spread (max/min) = 1.17
+Range(entry_year)         : {0: 985, 1: 508, 2: 507} -> spread (max/min) = 1.94
+Result-release traffic for intake 2025 (hash)  : {0: 183, 1: 147, 2: 155} (load shared by all shards)
+Result-release traffic for intake 2025 (range) : {0: 485} (ONE shard takes everything: hot spot)
+Decision: hash on matric_no (_id) for even load; keep cross-student reports in an analytics replica.
+
+=== 2. REPLICATION: 1 primary + 2 async replicas, lag 20-120 ms ===
+t= 10 ms  primary='B (65)'   replica-1(lag 106ms)=None  replica-2(lag 114ms)=None
+t= 50 ms  primary='B (65)'   replica-1(lag 106ms)=None  replica-2(lag 114ms)=None
+t=150 ms  primary='B (65)'   replica-1(lag 106ms)='B (65)'  replica-2(lag 114ms)='B (65)'
+Eventual consistency: replicas converge after the lag. Read-your-writes fix: route a student's reads to the primary for a few seconds after a grade change.
+
+=== 3. QUORUM: N=3 replicas ===
+W=1, R=1: R+W=2 -> stale reads possible; tolerates 2 node failure(s) for writes, 2 for reads
+W=2, R=2: R+W=4 -> strongly consistent reads (read set overlaps latest write); tolerates 1 node failure(s) for writes, 1 for reads
+W=3, R=1: R+W=4 -> strongly consistent reads (read set overlaps latest write); tolerates 0 node failure(s) for writes, 2 for reads
+W=1, R=3: R+W=4 -> strongly consistent reads (read set overlaps latest write); tolerates 2 node failure(s) for writes, 0 for reads

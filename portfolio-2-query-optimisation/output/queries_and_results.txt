@@ -1,0 +1,140 @@
+=== Q1_transcript_student_1234 ===
+SELECT s.session, s.term, g.course_code, g.title, g.credit_units, g.total_score, g.grade, g.grade_point
+FROM v_graded_result g
+JOIN semester s ON s.semester_id = g.semester_id
+WHERE g.student_id = 1234
+ORDER BY s.session, s.term, g.course_code;
+
+-- 20 row(s); first 8 shown
+session | term | course_code | title | credit_units | total_score | grade | grade_point
+2024/2025 | First | ACC418 | ACC Topic 18 | 2 | 38 | F | 0
+2024/2025 | First | CSC204 | CSC Topic 4 | 3 | 66 | B | 4
+2024/2025 | First | CSC413 | CSC Topic 13 | 2 | 55 | C | 3
+2024/2025 | First | EEE410 | EEE Topic 10 | 3 | 61 | B | 4
+2024/2025 | First | MTH314 | MTH Topic 14 | 4 | 65 | B | 4
+2024/2025 | Second | ACC301 | ACC Topic 1 | 3 | 41 | E | 1
+2024/2025 | Second | ACC314 | ACC Topic 14 | 3 | 57 | C | 3
+2024/2025 | Second | CSC303 | CSC Topic 3 | 2 | 72 | A | 5
+
+-- EXPLAIN QUERY PLAN
+   SEARCH reg USING COVERING INDEX sqlite_autoindex_registration_1 (student_id=?)
+   SEARCH r USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH o USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH s USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH g USING INDEX sqlite_autoindex_grade_scale_2 (min_score<?)
+   USE TEMP B-TREE FOR ORDER BY
+
+=== Q2_cgpa_student_1234 ===
+SELECT st.matric_no,
+       SUM(g.credit_units) AS total_units,
+       ROUND(1.0 * SUM(g.grade_point * g.credit_units) / SUM(g.credit_units), 2) AS cgpa
+FROM v_graded_result g JOIN student st ON st.student_id = g.student_id
+WHERE g.student_id = 1234
+GROUP BY st.student_id;
+
+-- 1 row(s); first 8 shown
+matric_no | total_units | cgpa
+MIT/2025/01234 | 58 | 2.66
+
+-- EXPLAIN QUERY PLAN
+   SEARCH st USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH reg USING COVERING INDEX sqlite_autoindex_registration_1 (student_id=?)
+   SEARCH r USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH o USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH g USING INDEX sqlite_autoindex_grade_scale_2 (min_score<?)
+
+=== Q3_top3_per_programme_by_cgpa ===
+WITH cgpa AS (
+  SELECT st.student_id, st.matric_no, st.programme_id,
+         1.0 * SUM(g.grade_point * g.credit_units) / SUM(g.credit_units) AS cgpa
+  FROM student st JOIN v_graded_result g ON g.student_id = st.student_id
+  GROUP BY st.student_id),
+ranked AS (
+  SELECT *, RANK() OVER (PARTITION BY programme_id ORDER BY cgpa DESC) AS rnk FROM cgpa)
+SELECT p.programme_name, r.matric_no, ROUND(r.cgpa,2) AS cgpa, r.rnk
+FROM ranked r JOIN programme p ON p.programme_id = r.programme_id
+WHERE r.rnk <= 3 ORDER BY p.programme_name, r.rnk, r.matric_no;
+
+-- 24 row(s); first 8 shown
+programme_name | matric_no | cgpa | rnk
+BSc Accounting | MIT/2022/01547 | 3.94 | 1
+BSc Accounting | MIT/2022/01198 | 3.92 | 2
+BSc Accounting | MIT/2025/01877 | 3.86 | 3
+BSc Computer Science | MIT/2025/01534 | 4.0 | 1
+BSc Computer Science | MIT/2025/01244 | 3.94 | 2
+BSc Computer Science | MIT/2022/01782 | 3.89 | 3
+BSc Economics | MIT/2023/00718 | 4.33 | 1
+BSc Economics | MIT/2025/00457 | 3.9 | 2
+
+-- EXPLAIN QUERY PLAN
+   CO-ROUTINE ranked
+   CO-ROUTINE (subquery-5)
+   CO-ROUTINE cgpa
+   SCAN st
+   SEARCH reg USING COVERING INDEX sqlite_autoindex_registration_1 (student_id=?)
+   SEARCH r USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH o USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH g USING INDEX sqlite_autoindex_grade_scale_2 (min_score<?)
+   SCAN cgpa
+   USE TEMP B-TREE FOR ORDER BY
+   SCAN (subquery-5)
+   SCAN r
+   SEARCH p USING INTEGER PRIMARY KEY (rowid=?)
+   USE TEMP B-TREE FOR ORDER BY
+
+=== Q4_failure_rate_by_department ===
+SELECT d.dept_name, COUNT(*) AS results,
+       SUM(g.grade = 'F') AS fails,
+       ROUND(100.0 * SUM(g.grade = 'F') / COUNT(*), 1) AS fail_pct
+FROM v_graded_result g
+JOIN course c ON c.course_id = g.course_id
+JOIN department d ON d.dept_id = c.dept_id
+GROUP BY d.dept_id ORDER BY fail_pct DESC;
+
+-- 5 row(s); first 8 shown
+dept_name | results | fails | fail_pct
+Electrical Engineering | 7644 | 845 | 11.1
+Computer Science | 8486 | 932 | 11.0
+Accounting | 7428 | 811 | 10.9
+Economics | 8676 | 908 | 10.5
+Mathematics | 7766 | 816 | 10.5
+
+-- EXPLAIN QUERY PLAN
+   SCAN reg USING COVERING INDEX sqlite_autoindex_registration_1
+   SEARCH r USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH o USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH g USING INDEX sqlite_autoindex_grade_scale_2 (min_score<?)
+   SEARCH d USING INTEGER PRIMARY KEY (rowid=?)
+   USE TEMP B-TREE FOR GROUP BY
+   USE TEMP B-TREE FOR ORDER BY
+
+=== Q5_class_list_offering_150 ===
+SELECT st.matric_no, st.first_name, st.last_name, r.ca_score, r.exam_score, r.total_score
+FROM registration reg
+JOIN student st ON st.student_id = reg.student_id
+JOIN result r ON r.reg_id = reg.reg_id
+WHERE reg.offering_id = 150
+ORDER BY st.matric_no;
+
+-- 137 row(s); first 8 shown
+matric_no | first_name | last_name | ca_score | exam_score | total_score
+MIT/2022/00002 | Hauwa | Abdullahi | 29 | 33 | 62
+MIT/2022/00056 | Sadiq | Mohammed | 35 | 41 | 76
+MIT/2022/00057 | Halima | Usman | 31 | 40 | 71
+MIT/2022/00079 | Sadiq | Abdullahi | 22 | 42 | 64
+MIT/2022/00244 | Chinedu | Usman | 19 | 55 | 74
+MIT/2022/00282 | Ibrahim | Abdullahi | 23 | 34 | 57
+MIT/2022/00301 | Segun | Bello | 24 | 29 | 53
+MIT/2022/00305 | Yusuf | Eze | 12 | 35 | 47
+
+-- EXPLAIN QUERY PLAN
+   SCAN reg USING COVERING INDEX sqlite_autoindex_registration_1
+   SEARCH st USING INTEGER PRIMARY KEY (rowid=?)
+   SEARCH r USING INTEGER PRIMARY KEY (rowid=?)
+   USE TEMP B-TREE FOR ORDER BY
+

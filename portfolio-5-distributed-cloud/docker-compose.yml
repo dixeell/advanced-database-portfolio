@@ -1,0 +1,36 @@
+# UNTESTED in the build sandbox (no Docker). Verify image tags/variables against current docs before use.
+# Start: docker compose up -d
+# Check replication:  docker exec -it pg-primary psql -U postgres -c "select client_addr,state from pg_stat_replication;"
+services:
+  pg-primary:
+    image: bitnami/postgresql:16
+    container_name: pg-primary
+    environment:
+      POSTGRESQL_REPLICATION_MODE: master
+      POSTGRESQL_REPLICATION_USER: repl
+      POSTGRESQL_REPLICATION_PASSWORD: repl_pass
+      POSTGRESQL_PASSWORD: change_me
+      POSTGRESQL_DATABASE: university
+    ports: ["5432:5432"]
+  pg-replica:
+    image: bitnami/postgresql:16
+    container_name: pg-replica
+    depends_on: [pg-primary]
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_MASTER_HOST: pg-primary
+      POSTGRESQL_REPLICATION_USER: repl
+      POSTGRESQL_REPLICATION_PASSWORD: repl_pass
+      POSTGRESQL_PASSWORD: change_me
+    ports: ["5433:5432"]
+  mongo1:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports: ["27017:27017"]
+  mongo2:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+  mongo3:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+# Then: docker exec -it <mongo1> mongosh --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo1:27017"},{_id:1,host:"mongo2:27017"},{_id:2,host:"mongo3:27017"}]})'

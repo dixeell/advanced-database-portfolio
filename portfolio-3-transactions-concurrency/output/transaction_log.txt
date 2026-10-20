@@ -1,0 +1,38 @@
+=== 1. COMMIT: valid registration ===
+before: (0, 2) registrations: 0
+student 1990 -> COMMITTED
+after : (1, 2) registrations: 1
+
+=== 2a. ROLLBACK: duplicate registration (UNIQUE violation) ===
+student 1990 again -> ROLLED BACK (IntegrityError: UNIQUE constraint failed: registration.student_id, registration.offering_id)
+state unchanged: (1, 2) registrations: 1
+
+=== 2b. ROLLBACK: course full (CHECK seats_taken <= capacity fails AFTER the INSERT) ===
+student 1991 -> COMMITTED (fills the course)
+student 1992 -> ROLLED BACK (IntegrityError: CHECK constraint failed: seats_taken >= 0 AND seats_taken <= capacity)
+state: (2, 2) registrations: 2 <- the half-done INSERT was undone, no orphan row
+
+=== 2c. Grade correction with audit trigger: COMMIT then ROLLBACK ===
+result before: (1, 18, 41)
+audit rows for reg 1 : [(59, 60)]
+invalid score rejected and rolled back: CHECK constraint failed: exam_score BETWEEN 0 AND 60
+result after : (1, 18, 42)
+
+=== 3. ISOLATION: no dirty reads (WAL mode snapshot) ===
+writer (uncommitted) sees capacity: 500
+reader sees capacity            : 2 <- uncommitted change invisible
+after ROLLBACK reader sees      : 2
+
+=== 4. CONCURRENCY: 3 students race for the LAST seat (capacity 1) ===
+
+--- 4a. Uncontrolled read-modify-write ---
+thread outcomes: {1993: 'registered', 1994: 'registered', 1995: 'registered'}
+final seats_taken=1, capacity=1, registration rows=3 -> ANOMALY: overbooked / counter wrong
+
+--- 4b. Fix 1: BEGIN IMMEDIATE (pessimistic lock) ---
+thread outcomes: {1994: 'registered', 1995: 'rejected: full', 1993: 'rejected: full'}
+final seats_taken=1, capacity=1, registration rows=1 -> CONSISTENT
+
+--- 4c. Fix 2: atomic conditional UPDATE ---
+thread outcomes: {1994: 'registered', 1993: 'rejected: full', 1995: 'rejected: full'}
+final seats_taken=1, capacity=1, registration rows=1 -> CONSISTENT

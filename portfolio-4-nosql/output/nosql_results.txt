@@ -1,0 +1,25 @@
+--- Q1 transcript lookup by _id (db.students.findOne({_id: ...})) ---
+MIT/2025/01234 {'first': 'Segun', 'last': 'Balogun'} | results embedded: 20 | cgpa: 2.66
+first result: {'course_code': 'CSC303', 'title': 'CSC Topic 3', 'units': 2, 'semester': '2024/2025 Second', 'score': 72, 'grade': 'A', 'gp': 5}
+
+--- Q2 average CGPA per programme (aggregation: $group by programme.name, $avg cgpa) ---
+BSc Accounting                3.079
+BSc Computer Science          3.085
+BSc Economics                 3.115
+BSc Electrical Engineering    3.07
+BSc Mathematics               3.104
+BSc Software Engineering      3.139
+MSc Information Technology    3.074
+PGD Data Analytics            3.067
+
+--- Cross-check against SQL (same question) ---
+NoSQL and SQL averages agree: True
+
+--- Q3 count students with at least one 'F' ($match results.grade == 'F') ---
+1808 students
+SQL cross-check: 1808 -> match: True
+
+--- Key-value example (Redis-style result cache) ---
+GET cgpa:MIT/2022/00001 -> 2.95
+GET cgpa:MIT/2022/00002 -> 3.61
+GET cgpa:MIT/2022/00003 -> 3.1

@@ -1,0 +1,27 @@
+### O1 class list for one offering
+SQL: SELECT st.matric_no, r.total_score FROM registration reg JOIN student st ON st.student_id=reg.student_id JOIN result r ON r.reg_id=reg.reg_id WHERE reg.offering_id = ?
+Index: CREATE INDEX idx_registration_offering ON registration(offering_id)
+BEFORE plan: ['SCAN st USING COVERING INDEX sqlite_autoindex_student_1', 'SEARCH reg USING COVERING INDEX sqlite_autoindex_registration_1 (student_id=? AND offering_id=?)', 'SEARCH r USING INTEGER PRIMARY KEY (rowid=?)']
+AFTER  plan: ['SEARCH reg USING INDEX idx_registration_offering (offering_id=?)', 'SEARCH st USING INTEGER PRIMARY KEY (rowid=?)', 'SEARCH r USING INTEGER PRIMARY KEY (rowid=?)']
+Median time: 0.694 ms -> 0.143 ms (4.9x)
+
+### O2 active students in a programme/intake
+SQL: SELECT COUNT(*) FROM student WHERE programme_id = ? AND status = 'active' AND entry_year = ?
+Index: CREATE INDEX idx_student_prog_status_year ON student(programme_id, status, entry_year)
+BEFORE plan: ['SCAN student']
+AFTER  plan: ['SEARCH student USING COVERING INDEX idx_student_prog_status_year (programme_id=? AND status=? AND entry_year=?)']
+Median time: 0.099 ms -> 0.008 ms (12.3x)
+
+### O3 failing results (score < 40)
+SQL: SELECT COUNT(*) FROM result WHERE total_score < ?
+Index: CREATE INDEX idx_result_total ON result(total_score)
+BEFORE plan: ['SCAN result']
+AFTER  plan: ['SEARCH result USING INDEX idx_result_total (total_score<?)']
+Median time: 1.937 ms -> 0.207 ms (9.3x)
+
+### O4 results for one semester via offering
+SQL: SELECT COUNT(*) FROM registration reg JOIN course_offering o ON o.offering_id = reg.offering_id WHERE o.semester_id = ?
+Index: CREATE INDEX idx_offering_semester ON course_offering(semester_id)
+BEFORE plan: ['SCAN o USING COVERING INDEX sqlite_autoindex_course_offering_1', 'SEARCH reg USING COVERING INDEX idx_registration_offering (offering_id=?)']
+AFTER  plan: ['SEARCH o USING COVERING INDEX idx_offering_semester (semester_id=?)', 'SEARCH reg USING COVERING INDEX idx_registration_offering (offering_id=?)']
+Median time: 0.309 ms -> 0.329 ms (0.9x)
