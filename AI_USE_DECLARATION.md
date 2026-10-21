@@ -2,6 +2,5 @@
 
 1. **AI tool used:** Claude (Anthropic).
 2. **What it was used for:** drafting the schema, seed script, SQL/NoSQL queries, concurrency demonstrations, simulation scripts and first drafts of the README/discussion documents.
-3. **How the output was reviewed, corrected, tested, or verified:** <WRITE THIS YOURSELF, truthfully. Suggested points: I ran every script on my own machine; I read each query and can explain it; I changed X because Y; I checked NoSQL results against SQL; I ran the untested PostgreSQL/MongoDB/Docker files myself and took the screenshots in `evidence/`.>
-
+3. Verification: I installed and configured Python, PostgreSQL, MongoDB and a MongoDB Atlas cluster myself. I ran every script and all PostgreSQL and MongoDB demonstrations, captured the output as evidence, and checked that the NoSQL results matched the SQL. I replaced the benchmark figures with my own measurements.I can explain the work submitted.
 I remain responsible for the accuracy, originality and understanding of all submitted work.
