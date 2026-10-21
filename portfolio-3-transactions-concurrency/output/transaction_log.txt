@@ -26,7 +26,7 @@ after ROLLBACK reader sees      : 2
 === 4. CONCURRENCY: 3 students race for the LAST seat (capacity 1) ===
 
 --- 4a. Uncontrolled read-modify-write ---
-thread outcomes: {1993: 'registered', 1994: 'registered', 1995: 'registered'}
+thread outcomes: {1995: 'registered', 1993: 'registered', 1994: 'registered'}
 final seats_taken=1, capacity=1, registration rows=3 -> ANOMALY: overbooked / counter wrong
 
 --- 4b. Fix 1: BEGIN IMMEDIATE (pessimistic lock) ---
@@ -34,5 +34,5 @@ thread outcomes: {1994: 'registered', 1995: 'rejected: full', 1993: 'rejected: f
 final seats_taken=1, capacity=1, registration rows=1 -> CONSISTENT
 
 --- 4c. Fix 2: atomic conditional UPDATE ---
-thread outcomes: {1994: 'registered', 1993: 'rejected: full', 1995: 'rejected: full'}
+thread outcomes: {1993: 'registered', 1995: 'rejected: full', 1994: 'rejected: full'}
 final seats_taken=1, capacity=1, registration rows=1 -> CONSISTENT
